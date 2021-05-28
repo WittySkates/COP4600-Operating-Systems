@@ -1,0 +1,113 @@
+diff --git a/arch/x86/entry/syscalls/syscall_64.tbl b/arch/x86/entry/syscalls/syscall_64.tbl
+index bbfc6d440870..5b97bcb975af 100644
+--- a/arch/x86/entry/syscalls/syscall_64.tbl
++++ b/arch/x86/entry/syscalls/syscall_64.tbl
+@@ -345,6 +345,9 @@
+ 334	common	rseq			__x64_sys_rseq
+ 424	common	pidfd_send_signal	__x64_sys_pidfd_send_signal
+ 434	common	pidfd_open		__x64_sys_pidfd_open
++435 common  get_proc_log_level  __x64_sys_get_proc_log_level
++436 common  set_proc_log_level  __x64_sys_set_proc_log_level
++437 common  proc_log_message    __x64_sys_proc_log_message
+ 
+ #
+ # x32-specific system call numbers start at 512 to avoid cache impact
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index 8e5b2c6d5dea..83c0c35ff338 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -1297,4 +1297,8 @@ static inline unsigned int ksys_personality(unsigned int personality)
+ 	return old;
+ }
+ 
++asmlinkage int sys_get_proc_log_level(void);
++asmlinkage int sys_set_proc_log_level(int new_level);
++asmlinkage int sys_proc_log_message(char* message, int level);
++
+ #endif
+diff --git a/kernel/sys.c b/kernel/sys.c
+index 0a1cdee858de..30cd50454a60 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -2742,6 +2742,81 @@ SYSCALL_DEFINE1(sysinfo, struct sysinfo __user *, info)
+ 	return 0;
+ }
+ 
++int process_log_level = 0;
++
++SYSCALL_DEFINE0(get_proc_log_level)
++{
++	printk("get_proc_log_level: Current proccess log level: %d", process_log_level); 
++	return process_log_level;
++}
++
++SYSCALL_DEFINE1(set_proc_log_level, int, new_level)
++{	
++	const struct cred *cred = current_cred();
++
++	if(cred->euid.val == 0 && new_level <= 7 && new_level >=0)
++	{
++		process_log_level = new_level;
++		printk("set_proc_log_level: New proccess log level %d", process_log_level);
++		return  process_log_level;
++	}
++	printk("set_proc_log_level: Permission denied or invald level"); 
++	return -1;
++}
++
++SYSCALL_DEFINE2(proc_log_message, char*, message, int, level)
++{
++	if(level < 0 || level > 7) 
++	{
++		return -1;
++	}
++
++	if(level <= process_log_level)
++	{
++		char *con_message = kmalloc(strlen(message) + 1, GFP_KERNEL);
++
++		strncpy_from_user(con_message, message, strlen(message) + 1);
++
++		switch (level)
++		{
++			case 0:
++				printk(KERN_EMERG "PROC_OVERRIDE [%s %d]: %s", current->comm, current->pid, con_message);
++				break;
++			case 1:
++				printk(KERN_ALERT "PROC_ALERT [%s %d]: %s", current->comm, current->pid, con_message);
++				break;
++			case 2:
++				printk(KERN_CRIT "PROC_CRITICAL [%s %d]: %s", current->comm, current->pid, con_message);
++				break;
++			case 3:
++				printk(KERN_ERR "PROC_ERROR [%s %d]: %s", current->comm, current->pid, con_message);
++				break;
++			case 4:
++				printk(KERN_WARNING "PROC_WARNING [%s %d]: %s", current->comm, current->pid, con_message);
++				break;
++			case 5:
++				printk(KERN_NOTICE "PROC_NOTICE [%s %d]: %s", current->comm, current->pid, con_message);
++				break;
++			case 6:
++				printk(KERN_INFO "PROC_INFO [%s %d]: %s", current->comm, current->pid, con_message);
++				break;
++			case 7:
++				printk(KERN_DEBUG "PROC_DEBUG [%s %d]: %s", current->comm, current->pid, con_message);
++				break;
++		}
++		return level;
++	}
++
++	if(level <= 7)
++	{
++		return level;
++	}
++	
++	return -1;
++}
++
++
++
+ #ifdef CONFIG_COMPAT
+ struct compat_sysinfo {
+ 	s32 uptime;

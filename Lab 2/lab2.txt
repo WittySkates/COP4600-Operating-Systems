@@ -1,0 +1,21 @@
+Lab 2 Report by Connor Dupuis
+
+Modified Boot Message:
+First I googled where the function "rcu_end_inkernel_boot()" was used. Doing this led me to the main.c file in
+the directory /usr/rep/src/reptilian-kernel/init. I then opened the main.c file with the command "sudo nano main.c"
+and used the shortcut ctrl+w to search the file for "rcu_end_inkernel_boot()". Finally I added a pr_crit() line
+which prints the desired text before the function call. I used a critical print so that the message shows even when
+not in verbose mode.
+
+I tested this by going back to my snapshot of my clean kernel and patching it with the updated code.
+
+Extra Credit Grub Menu:
+I searched around the file system until I ran into a folder named "grub". After opening the folder, it contained a
+file name menu.lst. Opening this file listed the grub menu for the startup. I used the command "sudo nano menu.lst"
+to make the appropriate changes to the menu.lst file so it displays my name in parenthesis at startup.
+
+Link: https://www.youtube.com/watch?v=f5wlWSdtZdc
+
+
+
+
